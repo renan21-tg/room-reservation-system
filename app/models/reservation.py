@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 
 from sqlalchemy import DateTime, ForeignKey, String
@@ -18,8 +18,8 @@ class Reservation(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     room_id: Mapped[int] = mapped_column(ForeignKey("rooms.id"), nullable=False)
-    starts_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    ends_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     purpose: Mapped[str] = mapped_column(String(200), nullable=False)
     status: Mapped[str] = mapped_column(
         String(20),
