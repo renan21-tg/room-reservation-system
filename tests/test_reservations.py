@@ -1,4 +1,5 @@
 import pytest
+import threading
 from datetime import datetime, timezone
 
 def make_user(client, email="u@u.com"):
@@ -39,13 +40,13 @@ def test_reservation_conflict_starts_inside(client):
         "user_id": user["id"], "room_id": room["id"],
         "starts_at": "2025-09-01T09:00:00+00:00",
         "ends_at": "2025-09-01T11:00:00+00:00",
-        "purpose": "R1"
+        "purpose": "R11"
     })
     r = client.post("/reservations", json={
         "user_id": user["id"], "room_id": room["id"],
         "starts_at": "2025-09-01T10:00:00+00:00",
         "ends_at": "2025-09-01T12:00:00+00:00",
-        "purpose": "R2"
+        "purpose": "R22"
     })
     assert r.status_code == 409
 
@@ -55,11 +56,11 @@ def test_different_rooms_no_conflict(client):
     room2 = make_room(client, name="Sala B")
     client.post("/reservations", json={
         "user_id": user["id"], "room_id": room1["id"],
-        "starts_at": BASE_START, "ends_at": BASE_END, "purpose": "R1"
+        "starts_at": BASE_START, "ends_at": BASE_END, "purpose": "R11"
     })
     r = client.post("/reservations", json={
         "user_id": user["id"], "room_id": room2["id"],
-        "starts_at": BASE_START, "ends_at": BASE_END, "purpose": "R2"
+        "starts_at": BASE_START, "ends_at": BASE_END, "purpose": "R22"
     })
     assert r.status_code == 201
 
@@ -108,12 +109,12 @@ def test_canceled_reservation_frees_slot(client):
     room = make_room(client)
     res = client.post("/reservations", json={
         "user_id": user["id"], "room_id": room["id"],
-        "starts_at": BASE_START, "ends_at": BASE_END, "purpose": "R1"
+        "starts_at": BASE_START, "ends_at": BASE_END, "purpose": "R11"
     }).json()
     client.patch(f"/reservations/{res['id']}/cancel")
     r = client.post("/reservations", json={
         "user_id": user["id"], "room_id": room["id"],
-        "starts_at": BASE_START, "ends_at": BASE_END, "purpose": "R2"
+        "starts_at": BASE_START, "ends_at": BASE_END, "purpose": "R22"
     })
     assert r.status_code == 201
 
@@ -123,8 +124,33 @@ def test_list_reservations_by_user(client):
     room = make_room(client)
     client.post("/reservations", json={
         "user_id": u1["id"], "room_id": room["id"],
-        "starts_at": BASE_START, "ends_at": BASE_END, "purpose": "R1"
+        "starts_at": BASE_START, "ends_at": BASE_END, "purpose": "R11"
     })
     r = client.get(f"/reservations?user_id={u1['id']}")
     assert r.status_code == 200
     assert all(res["user_id"] == u1["id"] for res in r.json())
+
+
+def test_concurrent_booking_no_double(client):
+    user = make_user(client)
+    room = make_room(client)
+    results = []
+    payload = {
+        "user_id": user["id"], "room_id": room["id"],
+        "starts_at": BASE_START, "ends_at": BASE_END,
+        "purpose": "Concorrente"
+    }
+
+    def book():
+        r = client.post("/reservations", json=payload)
+        results.append(r.status_code)
+
+    t1 = threading.Thread(target=book)
+    t2 = threading.Thread(target=book)
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+
+    assert results.count(201) == 1
+    assert results.count(409) == 1

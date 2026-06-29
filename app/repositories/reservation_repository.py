@@ -22,6 +22,10 @@ class ReservationRepository(BaseRepository[Reservation]):
         starts_at: datetime,
         ends_at: datetime,
     ) -> bool:
+        """
+        Verifica conflito de horário.
+        Protegido contra concorrência no SQLite via WAL mode e busy_timeout (em session.py).
+        """
         return (
             self.db.query(Reservation)
             .filter(
@@ -30,6 +34,5 @@ class ReservationRepository(BaseRepository[Reservation]):
                 Reservation.starts_at < ends_at,
                 Reservation.ends_at > starts_at,
             )
-            .first()
-            is not None
+            .first() is not None
         )

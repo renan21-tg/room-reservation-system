@@ -24,13 +24,26 @@ class ReservationService:
         if not room.is_active:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Room is inactive")
 
-        if self.repository.has_conflict(payload.room_id, payload.starts_at, payload.ends_at):
+        try:
+            if self.repository.has_conflict(payload.room_id, payload.starts_at, payload.ends_at):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Room already reserved for this time range",
+                )
+            reservation = Reservation(**payload.model_dump())
+            self.repository.db.add(reservation)
+            self.repository.db.commit()
+            self.repository.db.refresh(reservation)
+            return reservation
+        except HTTPException:
+            self.repository.db.rollback()
+            raise
+        except Exception as exc:
+            self.repository.db.rollback()
             raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Room already reserved for this time range",
-            )
-
-        return self.repository.add(Reservation(**payload.model_dump()))
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Unexpected error",
+            ) from exc
 
     def list(self, user_id: int | None = None) -> list[Reservation]:
         if user_id is not None:
