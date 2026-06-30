@@ -45,3 +45,33 @@ def client(db):
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
+
+
+def create_user(client, email="user@example.com", role="user"):
+    return client.post(
+        "/users",
+        json={
+            "name": "Test User",
+            "email": email,
+            "password": "secret123",
+            "role": role,
+        },
+    ).json()
+
+
+def auth_headers(client, email, password="secret123"):
+    response = client.post("/auth/login", json={"email": email, "password": password})
+    token = response.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture(scope="function")
+def admin_headers(client):
+    create_user(client, email="admin@example.com", role="admin")
+    return auth_headers(client, "admin@example.com")
+
+
+@pytest.fixture(scope="function")
+def user_headers(client):
+    create_user(client, email="user@example.com", role="user")
+    return auth_headers(client, "user@example.com")

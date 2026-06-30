@@ -2,45 +2,65 @@
 
 ```mermaid
 flowchart LR
-    Usuário([Usuário])
+    Usuario([Usuario])
     Admin([Administrador])
 
     subgraph Sistema["Sistema de Reserva de Salas"]
-        UC1["Consultar salas disponíveis"]
-        UC2["Criar reserva"]
-        UC3["Consultar minhas reservas"]
-        UC4["Cancelar reserva"]
-        UC5["Cadastrar sala"]
-        UC6["Atualizar sala"]
-        UC7["Listar reservas"]
-        UC8["Validar conflito de horário"]
+        UC1["Cadastrar-se"]
+        UC2["Autenticar-se"]
+        UC3["Consultar salas disponiveis"]
+        UC4["Solicitar reserva"]
+        UC5["Consultar minhas reservas"]
+        UC6["Cancelar reserva"]
+        UC7["Cadastrar sala"]
+        UC8["Atualizar sala"]
+        UC9["Listar reservas"]
+        UC10["Aprovar reserva"]
+        UC11["Rejeitar reserva"]
+        UC12["Validar conflito de horario"]
+        UC13["Controlar permissao por role"]
     end
 
-    Usuário --> UC1
-    Usuário --> UC2
-    Usuário --> UC3
-    Usuário --> UC4
+    Usuario --> UC1
+    Usuario --> UC2
+    Usuario --> UC3
+    Usuario --> UC4
+    Usuario --> UC5
+    Usuario --> UC6
 
-    Admin --> UC5
-    Admin --> UC6
+    Admin --> UC2
     Admin --> UC7
-    Admin --> UC4
+    Admin --> UC8
+    Admin --> UC9
+    Admin --> UC10
+    Admin --> UC11
+    Admin --> UC6
 
-    UC2 --> UC8
+    UC4 --> UC12
+    UC7 --> UC13
+    UC8 --> UC13
+    UC9 --> UC13
+    UC10 --> UC13
+    UC11 --> UC13
 ```
 
 ## Atores
 
-- Usuário: pessoa que consulta salas, cria reservas e acompanha seus agendamentos.
-- Administrador: pessoa responsável por manter o cadastro de salas e acompanhar reservas do sistema.
+- Usuario: pessoa que consulta salas, solicita reservas e acompanha seus agendamentos.
+- Administrador: pessoa responsavel por manter salas e aprovar ou rejeitar reservas.
 
 ## Casos de uso principais
 
-- Consultar salas disponíveis: permite filtrar salas por capacidade e período.
-- Criar reserva: registra uma reserva para uma sala em um intervalo de horário.
-- Consultar minhas reservas: lista reservas vinculadas a um usuário.
-- Cancelar reserva: altera uma reserva ativa para cancelada.
-- Cadastrar sala: cria uma sala com nome, capacidade e localização.
-- Atualizar sala: altera dados cadastrais de uma sala.
-- Listar reservas: permite consulta administrativa das reservas.
-- Validar conflito de horário: regra interna chamada ao criar uma reserva.
+- Cadastrar-se: cria uma conta com email e senha.
+- Autenticar-se: gera token JWT para acessar rotas protegidas.
+- Consultar salas disponiveis: lista salas ativas, com filtro opcional por capacidade.
+- Solicitar reserva: cria uma reserva com status inicial `pending`.
+- Consultar minhas reservas: lista reservas do usuario autenticado.
+- Cancelar reserva: altera uma reserva para `canceled`.
+- Cadastrar sala: cria uma sala, permitido apenas para admin.
+- Atualizar sala: altera dados da sala, permitido apenas para admin.
+- Listar reservas: consulta administrativa das reservas.
+- Aprovar reserva: muda reserva `pending` para `approved`.
+- Rejeitar reserva: muda reserva `pending` para `rejected`.
+- Validar conflito de horario: impede double booking para reservas `pending` ou `approved`.
+- Controlar permissao por role: bloqueia rotas administrativas para usuarios comuns.

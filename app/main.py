@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api.routes import reservations, rooms, users
+from app.api.routes import auth, reservations, rooms, users
 from app.db.session import create_db_and_tables
 
 
@@ -27,5 +27,6 @@ def health_check() -> dict[str, str]:
 
 
 app.include_router(users.router, prefix="/users", tags=["users"])
+app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(rooms.router, prefix="/rooms", tags=["rooms"])
 app.include_router(reservations.router, prefix="/reservations", tags=["reservations"])

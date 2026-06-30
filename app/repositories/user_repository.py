@@ -8,3 +8,6 @@ class UserRepository(BaseRepository[User]):
 
     def get_by_email(self, email: str) -> User | None:
         return self.db.query(User).filter(User.email == email).first()
+
+    def count(self) -> int:
+        return self.db.query(User).count()

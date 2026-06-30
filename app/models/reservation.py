@@ -8,7 +8,9 @@ from app.db.base import Base
 
 
 class ReservationStatus(str, Enum):
-    ACTIVE = "active"
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
     CANCELED = "canceled"
 
 
@@ -23,7 +25,7 @@ class Reservation(Base):
     purpose: Mapped[str] = mapped_column(String(200), nullable=False)
     status: Mapped[str] = mapped_column(
         String(20),
-        default=ReservationStatus.ACTIVE.value,
+        default=ReservationStatus.PENDING.value,
         nullable=False,
     )
 

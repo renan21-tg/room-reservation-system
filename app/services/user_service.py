@@ -1,7 +1,8 @@
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.models.user import User
+from app.core.security import hash_password
+from app.models.user import User, UserRole
 from app.repositories.user_repository import UserRepository
 from app.schemas.user import UserCreate
 
@@ -16,7 +17,15 @@ class UserService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Email already registered",
             )
-        return self.repository.add(User(**payload.model_dump()))
+        if payload.role == UserRole.ADMIN and self.repository.count() > 0:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only the first user can be registered as admin",
+            )
+        data = payload.model_dump(exclude={"password"})
+        data["password_hash"] = hash_password(payload.password)
+        data["role"] = payload.role.value
+        return self.repository.add(User(**data))
 
     def list(self) -> list[User]:
         return self.repository.list()

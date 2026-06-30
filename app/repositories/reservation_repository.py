@@ -3,6 +3,11 @@ from datetime import datetime
 from app.models.reservation import Reservation, ReservationStatus
 from app.repositories.base import BaseRepository
 
+BLOCKING_STATUSES = [
+    ReservationStatus.PENDING.value,
+    ReservationStatus.APPROVED.value,
+]
+
 
 class ReservationRepository(BaseRepository[Reservation]):
     def __init__(self, db) -> None:
@@ -30,9 +35,10 @@ class ReservationRepository(BaseRepository[Reservation]):
             self.db.query(Reservation)
             .filter(
                 Reservation.room_id == room_id,
-                Reservation.status == ReservationStatus.ACTIVE.value,
+                Reservation.status.in_(BLOCKING_STATUSES),
                 Reservation.starts_at < ends_at,
                 Reservation.ends_at > starts_at,
             )
-            .first() is not None
+            .first()
+            is not None
         )

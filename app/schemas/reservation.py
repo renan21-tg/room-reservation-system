@@ -2,9 +2,11 @@ from datetime import datetime, timezone
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator, field_serializer
 
+from app.models.reservation import ReservationStatus
+
 
 class ReservationCreate(BaseModel):
-    user_id: int
+    user_id: int | None = None
     room_id: int
     starts_at: datetime
     ends_at: datetime
@@ -30,7 +32,7 @@ class ReservationRead(BaseModel):
     starts_at: datetime
     ends_at: datetime
     purpose: str
-    status: str
+    status: ReservationStatus
 
     model_config = ConfigDict(from_attributes=True)
 
