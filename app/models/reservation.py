@@ -14,6 +14,13 @@ class ReservationStatus(str, Enum):
     CANCELED = "canceled"
 
 
+class RecurrenceRule(str, Enum):
+    NONE = "none"
+    DAILY = "daily"
+    WEEKLY = "weekly"
+    MONTHLY = "monthly"
+
+
 class Reservation(Base):
     __tablename__ = "reservations"
 
@@ -29,5 +36,23 @@ class Reservation(Base):
         nullable=False,
     )
 
+    # ── Campos de recorrência ──────────────────────────────────────────
+    recurrence_rule: Mapped[str] = mapped_column(
+        String(20),
+        default=RecurrenceRule.NONE.value,
+        nullable=False,
+    )
+    recurrence_end_date: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    parent_id: Mapped[int | None] = mapped_column(
+        ForeignKey("reservations.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    # ──────────────────────────────────────────────────────────────────
+
     user: Mapped["User"] = relationship(back_populates="reservations")
     room: Mapped["Room"] = relationship(back_populates="reservations")
+

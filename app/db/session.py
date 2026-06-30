@@ -47,11 +47,32 @@ def _migrate_sqlite_dev_schema() -> None:
         return
 
     user_columns = {column["name"] for column in inspector.get_columns("users")}
+    reservation_columns = {
+        column["name"]
+        for column in inspector.get_columns("reservations")
+    } if "reservations" in inspector.get_table_names() else set()
+
     statements = []
+
+    # Migrações da tabela users
     if "password_hash" not in user_columns:
         statements.append("ALTER TABLE users ADD COLUMN password_hash VARCHAR(255)")
     if "role" not in user_columns:
         statements.append("ALTER TABLE users ADD COLUMN role VARCHAR(20) DEFAULT 'user'")
+
+    # Migrações da tabela reservations — campos de recorrência
+    if "recurrence_rule" not in reservation_columns:
+        statements.append(
+            "ALTER TABLE reservations ADD COLUMN recurrence_rule VARCHAR(20) DEFAULT 'none' NOT NULL"
+        )
+    if "recurrence_end_date" not in reservation_columns:
+        statements.append(
+            "ALTER TABLE reservations ADD COLUMN recurrence_end_date DATETIME NULL"
+        )
+    if "parent_id" not in reservation_columns:
+        statements.append(
+            "ALTER TABLE reservations ADD COLUMN parent_id INTEGER NULL REFERENCES reservations(id)"
+        )
 
     if not statements:
         return
