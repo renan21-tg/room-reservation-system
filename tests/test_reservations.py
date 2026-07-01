@@ -1,6 +1,7 @@
 import threading
 
 from tests.conftest import auth_headers, create_user
+from app.services.no_show_service import cancel_no_shows
 
 
 BASE_START = "2025-09-01T09:00:00+00:00"
@@ -337,4 +338,140 @@ def test_recurrence_daily_does_not_conflict_different_room(client, admin_headers
         "purpose": "Sala B sem conflito",
     }, headers=user_headers)
     assert r.status_code == 201
+
+
+# ── Testes de no-show ──────────────────────────────────────────────────
+
+def test_checkin_registers_timestamp(client, db, admin_headers):
+    """Check-in em reserva aprovada deve registrar checked_in_at."""
+    user, user_headers = make_user(client)
+    room = make_room(client, admin_headers)
+    res = client.post("/reservations", json={
+        "room_id": room["id"],
+        "starts_at": BASE_START, "ends_at": BASE_END, "purpose": "Reuniao"
+    }, headers=user_headers).json()
+
+    # Aprovar a reserva
+    client.patch(f"/reservations/{res['id']}/approve", headers=admin_headers)
+
+    # Fazer check-in
+    r = client.patch(f"/reservations/{res['id']}/checkin", headers=user_headers)
+    assert r.status_code == 200
+    assert r.json()["checked_in_at"] is not None
+
+
+def test_no_show_cancels_approved_without_checkin(db):
+    """Reserva aprovada sem check-in após o prazo é cancelada pelo job."""
+    from datetime import datetime, timedelta, timezone
+    from app.models.reservation import Reservation, ReservationStatus
+    from app.models.room import Room
+    from app.models.user import User
+    from app.core.security import hash_password
+
+    user = User(name="U", email="u@test.com", password_hash=hash_password("123"), role="user")
+    db.add(user)
+    room = Room(name="Sala T", location="Bloco T", capacity=10)
+    db.add(room)
+    db.flush()
+
+    past_start = datetime.now(timezone.utc) - timedelta(minutes=20)
+    reservation = Reservation(
+        user_id=user.id,
+        room_id=room.id,
+        starts_at=past_start,
+        ends_at=past_start + timedelta(hours=1),
+        purpose="No show",
+        status=ReservationStatus.APPROVED.value,
+        recurrence_rule="none",
+    )
+    db.add(reservation)
+    db.commit()
+
+    canceled_count = cancel_no_shows(db=db)
+
+    assert canceled_count == 1
+    db.refresh(reservation)
+    assert reservation.status == ReservationStatus.CANCELED.value
+
+
+def test_no_show_does_not_cancel_with_checkin(db):
+    """Reserva com check-in registrado NÃO deve ser cancelada."""
+    from datetime import datetime, timedelta, timezone
+    from app.models.reservation import Reservation, ReservationStatus
+    from app.models.room import Room
+    from app.models.user import User
+    from app.core.security import hash_password
+
+    user = User(name="V", email="v@test.com", password_hash=hash_password("123"), role="user")
+    db.add(user)
+    room = Room(name="Sala V", location="Bloco V", capacity=10)
+    db.add(room)
+    db.flush()
+
+    past_start = datetime.now(timezone.utc) - timedelta(minutes=20)
+    reservation = Reservation(
+        user_id=user.id,
+        room_id=room.id,
+        starts_at=past_start,
+        ends_at=past_start + timedelta(hours=1),
+        purpose="Com presenca",
+        status=ReservationStatus.APPROVED.value,
+        recurrence_rule="none",
+        checked_in_at=past_start + timedelta(minutes=5),
+    )
+    db.add(reservation)
+    db.commit()
+
+    canceled_count = cancel_no_shows(db=db)
+
+    assert canceled_count == 0
+    db.refresh(reservation)
+    assert reservation.status == ReservationStatus.APPROVED.value
+
+
+def test_no_show_does_not_cancel_pending(db):
+    """Reserva com status pending NÃO deve ser cancelada pelo job de no-show."""
+    from datetime import datetime, timedelta, timezone
+    from app.models.reservation import Reservation, ReservationStatus
+    from app.models.room import Room
+    from app.models.user import User
+    from app.core.security import hash_password
+
+    user = User(name="W", email="w@test.com", password_hash=hash_password("123"), role="user")
+    db.add(user)
+    room = Room(name="Sala W", location="Bloco W", capacity=10)
+    db.add(room)
+    db.flush()
+
+    past_start = datetime.now(timezone.utc) - timedelta(minutes=20)
+    reservation = Reservation(
+        user_id=user.id,
+        room_id=room.id,
+        starts_at=past_start,
+        ends_at=past_start + timedelta(hours=1),
+        purpose="Pendente",
+        status=ReservationStatus.PENDING.value,
+        recurrence_rule="none",
+    )
+    db.add(reservation)
+    db.commit()
+
+    canceled_count = cancel_no_shows(db=db)
+
+    assert canceled_count == 0
+    db.refresh(reservation)
+    assert reservation.status == ReservationStatus.PENDING.value
+
+
+def test_checkin_on_pending_reservation_returns_400(client, admin_headers):
+    """Check-in em reserva ainda pendente deve retornar 400."""
+    user, user_headers = make_user(client)
+    room = make_room(client, admin_headers)
+    res = client.post("/reservations", json={
+        "room_id": room["id"],
+        "starts_at": BASE_START, "ends_at": BASE_END, "purpose": "Pendente"
+    }, headers=user_headers).json()
+
+    r = client.patch(f"/reservations/{res['id']}/checkin", headers=user_headers)
+    assert r.status_code == 400
 

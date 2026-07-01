@@ -40,6 +40,15 @@ def get_reservation(
     return reservation
 
 
+@router.patch("/{reservation_id}/checkin", response_model=ReservationRead)
+def check_in_reservation(
+    reservation_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return ReservationService(db).check_in(reservation_id, current_user=current_user)
+
+
 @router.patch("/{reservation_id}/cancel", response_model=ReservationRead)
 def cancel_reservation(
     reservation_id: int,

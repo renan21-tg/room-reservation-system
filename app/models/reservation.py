@@ -51,7 +51,12 @@ class Reservation(Base):
         nullable=True,
         index=True,
     )
-    # ──────────────────────────────────────────────────────────────────
+
+    # ── Campos de no-show ──────────────────────────────────────────────
+    checked_in_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
 
     user: Mapped["User"] = relationship(back_populates="reservations")
     room: Mapped["Room"] = relationship(back_populates="reservations")

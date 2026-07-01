@@ -7,6 +7,9 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
 
+    # No-show: minutos de tolerância após starts_at para realizar check-in
+    no_show_grace_minutes: int = 15
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 

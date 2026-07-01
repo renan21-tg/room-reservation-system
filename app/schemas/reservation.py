@@ -58,10 +58,11 @@ class ReservationRead(BaseModel):
     recurrence_rule: RecurrenceRule
     recurrence_end_date: datetime | None
     parent_id: int | None
+    checked_in_at: datetime | None
 
     model_config = ConfigDict(from_attributes=True)
 
-    @field_serializer("starts_at", "ends_at", "recurrence_end_date")
+    @field_serializer("starts_at", "ends_at", "recurrence_end_date", "checked_in_at")
     def serialize_dt(self, dt: datetime | None) -> str | None:
         if dt is None:
             return None

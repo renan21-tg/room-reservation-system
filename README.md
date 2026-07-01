@@ -1,108 +1,108 @@
-# API para reserva de salas
+# API para Reserva de Salas
 
-Backend em Python para um Sistema de Reserva de Salas, desenvolvido para a disciplina Laboratorio de Engenharia de Software.
+Backend em Python para um Sistema de Reserva de Salas, desenvolvido para a disciplina Laboratório de Engenharia de Software.
 
-## Decisoes tecnicas
+---
 
-- Linguagem: Python.
-- Framework REST: FastAPI.
-- Validacao de dados: Pydantic.
-- Banco relacional: SQLite no desenvolvimento local.
-- ORM: SQLAlchemy.
-- Autenticacao: JWT com header `Authorization: Bearer <token>`.
-- Autorizacao: campo `User.role`, com perfis `user` e `admin`.
-- Design Pattern: Repository Pattern.
-- Testes: Pytest.
+## 🚀 Como executar
 
-## Estrutura escolhida
+Siga os passos abaixo para rodar a aplicação em seu ambiente local:
+
+1. **Crie e ative um ambiente virtual:**
+   ```bash
+   python -m venv .venv
+   # No Windows:
+   .venv\Scripts\activate
+   # No Linux/Mac:
+   # source .venv/bin/activate
+   ```
+
+2. **Instale as dependências:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Inicie o servidor:**
+   ```bash
+   uvicorn app.main:app --reload
+   ```
+
+A documentação interativa da API ficará disponível em:
+- **Swagger UI:** `http://127.0.0.1:8000/docs`
+
+---
+
+## 🛠️ Tecnologias e Decisões Técnicas
+
+- **Linguagem:** Python
+- **Framework REST:** FastAPI
+- **Validação de Dados:** Pydantic
+- **ORM:** SQLAlchemy
+- **Banco Relacional:** SQLite (para o desenvolvimento local)
+- **Autenticação:** JWT com envio via header `Authorization: Bearer <token>`
+- **Autorização:** Controle de acesso baseado no campo `User.role` (`user` e `admin`)
+- **Agendador de Tarefas:** APScheduler (utilizado para automações, como o cancelamento de no-show)
+- **Testes:** Pytest
+
+---
+
+## 🏗️ Padrão de Projeto: Repository Pattern
+
+O projeto utiliza o **Repository Pattern** (Padrão de Repositório) para gerenciar a persistência e a busca de dados.
+
+### Como ele foi aplicado no projeto?
+Em vez de permitir que a camada de serviços (`services/`) interaja diretamente com o banco de dados instanciando queries do SQLAlchemy, nós criamos classes de repositório dedicadas para cada entidade (por exemplo: `UserRepository`, `RoomRepository`, `ReservationRepository`). 
+
+**Vantagens observadas na aplicação:**
+- **Isolamento de Responsabilidades:** A camada de regras de negócio (Services) não sabe *como* os dados são salvos ou buscados (se é via SQLAlchemy, queries brutas, ou uma API externa). Ela apenas interage com os métodos abstratos (ex: `self.repository.get(id)` ou `self.repository.has_conflict()`).
+- **Reutilização:** Lógicas de queries complexas ou customizadas para o banco de dados ficam encapsuladas em um único lugar (dentro do repositório), evitando códigos repetidos ao longo dos endpoints ou serviços.
+- **Manutenção e Testes:** O encapsulamento permite que, em testes unitários ou na evolução do projeto, os dados e a comunicação com o banco possam ser facilmente testados, "mockados" ou até mesmo refatorados sem que as regras de negócio sofram qualquer impacto.
+
+---
+
+## 📁 Estrutura do Projeto
+
+O código-fonte está dividido e organizado da seguinte forma para separar claramente as responsabilidades:
 
 ```text
 app/
   api/
-    dependencies.py  Dependencias de autenticacao e permissao
-    routes/          Endpoints REST
-  core/              Configuracoes e seguranca
-  db/                Conexao e criacao das tabelas
-  models/            Modelos SQLAlchemy
-  repositories/      Acesso ao banco de dados
-  schemas/           Schemas Pydantic
-  services/          Regras de negocio
+    dependencies.py  # Dependências (ex: validar token e permissões)
+    routes/          # Controladores contendo os endpoints REST
+  core/              # Configurações globais e chaves de segurança
+  db/                # Conexão com o banco, migrações básicas e seed
+  models/            # Modelos mapeados pelo ORM (SQLAlchemy)
+  repositories/      # Classes de acesso ao banco (Repository Pattern)
+  schemas/           # Schemas do Pydantic (Validação de Input/Output)
+  services/          # Lógicas exclusivas de negócio (Casos de Uso)
+  scheduler.py       # Configuração de rotinas em plano de fundo
 docs/
   use-case-diagram.md
-tests/
+tests/               # Todos os testes (Pytest)
 requirements.txt
 ```
 
-## Fluxo principal
+---
 
-1. A inicializacao do banco garante um admin padrao.
-2. Usuarios comuns fazem cadastro com `role=user`.
-3. O usuario faz login em `/auth/login` e recebe um token JWT.
-4. O admin cadastra salas.
-5. O usuario solicita uma reserva.
-6. A reserva nasce com status `pending`.
-7. O sistema bloqueia conflito de horario para reservas `pending` ou `approved`.
-8. O admin aprova ou rejeita a reserva.
-9. Usuario ou admin podem cancelar uma reserva permitida.
+## ⚙️ Fluxo Principal
 
-## Admin padrao
+1. **Setup Inicial:** Ao iniciar o app, o sistema garante a criação de um **Admin padrão**.
+2. **Cadastro:** Usuários comuns realizam o cadastro no sistema (`role=user`).
+3. **Login:** O usuário realiza a autenticação pelo endpoint `/auth/login` e recebe um JWT válido.
+4. **Administração:** O administrador (admin) gerencia as **Salas** disponíveis no sistema.
+5. **Solicitação:** O usuário solicita uma **Reserva** de sala, que pode ser única ou **recorrente**.
+6. **Pendência:** Toda reserva nasce com o status inicial de `pending` (pendente). O sistema desde já bloqueia a criação de outras reservas no mesmo horário.
+7. **Aprovação:** O admin avalia as solicitações e pode **aprovar (`approved`)** ou **rejeitar (`rejected`)** a reserva.
+8. **Check-in / No-show:** Para reservas aprovadas, o usuário deve realizar o check-in no sistema na hora marcada. Caso não faça dentro da janela de tolerância, um Job em background cancela a reserva de forma automática.
+9. **Cancelamento:** A qualquer momento permitido, um usuário ou o admin pode cancelar ativamente a reserva.
 
-Ao iniciar a aplicacao, o arquivo `app/db/seed.py` cria ou atualiza o admin padrao:
+---
 
-```json
-{
-  "name": "admin",
-  "email": "admin@email.com",
-  "password": "admin123",
-  "role": "admin"
-}
-```
+## 🔐 Autenticação e Perfis (Admin Padrão)
 
-Esse seed e idempotente: se o email ja existir, o registro e atualizado para `role=admin` com a senha acima.
+A criação do Admin padrão pelo arquivo `app/db/seed.py` é uma operação idempotente: se o e-mail já existir, ele o converte/atualiza para admin.
 
-## Status de reserva
-
-- `pending`: solicitacao criada e aguardando decisao do administrador.
-- `approved`: reserva aprovada pelo administrador.
-- `rejected`: reserva recusada pelo administrador.
-- `canceled`: reserva cancelada.
-
-## Como executar
-
-```bash
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
-
-A documentacao interativa fica em:
-
-- Swagger UI: `http://127.0.0.1:8000/docs`
-- ReDoc: `http://127.0.0.1:8000/redoc`
-
-## Endpoints
-
-- `GET /health`
-- `POST /users`
-- `POST /auth/login`
-- `GET /users` - admin
-- `GET /users/{user_id}` - proprio usuario ou admin
-- `POST /rooms` - admin
-- `GET /rooms`
-- `GET /rooms/{room_id}`
-- `PATCH /rooms/{room_id}` - admin
-- `POST /reservations` - autenticado
-- `GET /reservations` - usuario ve as proprias; admin pode filtrar por `user_id`
-- `GET /reservations/{reservation_id}` - dono da reserva ou admin
-- `PATCH /reservations/{reservation_id}/cancel` - dono da reserva ou admin
-- `PATCH /reservations/{reservation_id}/approve` - admin
-- `PATCH /reservations/{reservation_id}/reject` - admin
-
-## Exemplo rapido
-
-Login com admin padrao:
-
+**Credenciais padrão para login:**
 ```json
 {
   "email": "admin@email.com",
@@ -110,13 +110,44 @@ Login com admin padrao:
 }
 ```
 
-Use o `access_token` retornado no header:
-
+O Token JWT recebido após o login deverá ser enviado em todas as requisições privadas utilizando o header HTTP:
 ```text
 Authorization: Bearer <token>
 ```
 
-## Testes
+---
+
+## 📡 Endpoints (Visão Geral)
+
+### Públicos
+- `GET /health` - Health check.
+- `POST /users` - Criação de novos usuários comuns.
+- `POST /auth/login` - Geração do token JWT.
+
+### Usuários
+- `GET /users` - *(Somente Admin)* Lista os usuários.
+- `GET /users/{user_id}` - *(Usuário visualiza a si próprio; Admin visualiza todos)*.
+
+### Salas
+- `GET /rooms` & `GET /rooms/{room_id}` - Lista informações das salas.
+- `POST /rooms` & `PATCH /rooms/{room_id}` - *(Somente Admin)* Gerencia os dados das salas.
+
+### Reservas
+- `GET /reservations` - Lista reservas. Usuários normais visualizam apenas as suas, Admins visualizam todas (suporta filtros).
+- `GET /reservations/{reservation_id}` - Retorna detalhes da reserva.
+- `POST /reservations` - Solicita a reserva de uma sala.
+- `PATCH /reservations/{reservation_id}/checkin` - Usuário assinala sua presença (check-in) na reserva.
+- `PATCH /reservations/{reservation_id}/cancel` - Cancela uma reserva existente.
+- `PATCH /reservations/{reservation_id}/approve` - *(Somente Admin)* Aprova a reserva.
+- `PATCH /reservations/{reservation_id}/reject` - *(Somente Admin)* Rejeita a reserva.
+
+**Possíveis status de reserva:** `pending`, `approved`, `rejected` e `canceled`.
+
+---
+
+## 🧪 Testes
+
+Para garantir o controle de qualidade do software, rode os testes automatizados já configurados com a biblioteca Pytest:
 
 ```bash
 pytest -q

@@ -5,12 +5,15 @@ from fastapi import FastAPI
 
 from app.api.routes import auth, reservations, rooms, users
 from app.db.session import create_db_and_tables
+from app.scheduler import start_scheduler, stop_scheduler
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     create_db_and_tables()
+    start_scheduler()
     yield
+    stop_scheduler()
 
 
 app = FastAPI(

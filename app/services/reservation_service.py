@@ -119,6 +119,31 @@ class ReservationService:
             )
         return reservation
 
+    def check_in(self, reservation_id: int, current_user) -> Reservation:
+        """Registra check-in do usuário na reserva."""
+        reservation = self.get(reservation_id)
+
+        if current_user.role != "admin" and reservation.user_id != current_user.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+        if reservation.status != ReservationStatus.APPROVED.value:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Check-in only allowed for approved reservations",
+            )
+
+        if reservation.checked_in_at is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Check-in already registered",
+            )
+
+        from datetime import datetime, timezone
+        reservation.checked_in_at = datetime.now(timezone.utc)
+        self.repository.db.commit()
+        self.repository.db.refresh(reservation)
+        return reservation
+
     def cancel(self, reservation_id: int, current_user) -> Reservation:
         reservation = self.get(reservation_id)
         if current_user.role != "admin" and reservation.user_id != current_user.id:

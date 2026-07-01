@@ -73,6 +73,10 @@ def _migrate_sqlite_dev_schema() -> None:
         statements.append(
             "ALTER TABLE reservations ADD COLUMN parent_id INTEGER NULL REFERENCES reservations(id)"
         )
+    if "checked_in_at" not in reservation_columns:
+        statements.append(
+            "ALTER TABLE reservations ADD COLUMN checked_in_at DATETIME NULL"
+        )
 
     if not statements:
         return
