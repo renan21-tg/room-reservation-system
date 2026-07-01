@@ -1,3 +1,4 @@
+from datetime import datetime
 from threading import Lock
 
 from fastapi import HTTPException, status
@@ -19,8 +20,55 @@ class ReservationService:
         self.users = UserRepository(db)
         self.rooms = RoomRepository(db)
 
+    def _enforce_profile_limits(
+        self,
+        user_id: int,
+        role: str,
+        starts_at: datetime,
+        ends_at: datetime,
+    ) -> None:
+        from app.core.config import settings
+
+        if role == "admin":
+            return  
+
+        duration_hours = (ends_at - starts_at).total_seconds() / 3600
+        max_hours = settings.user_max_hours_per_reservation
+        if duration_hours > max_hours:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"Reservation duration exceeds the {max_hours}h limit per reservation "
+                    f"for profile 'user'. Requested: {duration_hours:.1f}h."
+                ),
+            )
+        
+        active_count = self.repository.count_active_reservations(user_id)
+        max_active = settings.user_max_active_reservations
+        if active_count >= max_active:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"You already have {active_count} active reservation(s). "
+                    f"The limit for profile 'user' is {max_active}."
+                ),
+            )
+
+        reservation_day = starts_at.date()
+        hours_on_day = self.repository.sum_active_hours_on_day(user_id, reservation_day)
+        max_day_hours = settings.user_max_hours_per_day
+        new_hours = duration_hours
+        if hours_on_day + new_hours > max_day_hours:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"Adding this reservation would exceed the {max_day_hours}h daily limit "
+                    f"for profile 'user'. Already reserved: {hours_on_day:.1f}h. "
+                    f"Requested: {new_hours:.1f}h."
+                ),
+            )
+
     def create(self, payload: ReservationCreate, current_user) -> Reservation:
-        # ── Resolve user_id ───────────────────────────────────────────
         user_id = current_user.id
         if current_user.role == "admin" and payload.user_id is not None:
             user_id = payload.user_id
@@ -36,7 +84,13 @@ class ReservationService:
         if not room.is_active:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Room is inactive")
 
-        # ── Gera todas as ocorrências (incluindo a primeira) ──────────
+        self._enforce_profile_limits(
+            user_id=user_id,
+            role=current_user.role,
+            starts_at=payload.starts_at,
+            ends_at=payload.ends_at,
+        )
+
         extra_slots = generate_occurrences(
             starts_at=payload.starts_at,
             ends_at=payload.ends_at,
@@ -47,7 +101,6 @@ class ReservationService:
 
         try:
             with reservation_creation_lock:
-                # ── Verifica conflito em TODAS as ocorrências antes de inserir qualquer uma
                 for slot_start, slot_end in all_slots:
                     if self.repository.has_conflict(payload.room_id, slot_start, slot_end):
                         raise HTTPException(
@@ -58,7 +111,6 @@ class ReservationService:
                             ),
                         )
 
-                # ── Cria a reserva original (parent) ──────────────────
                 base_data = {
                     "user_id": user_id,
                     "room_id": payload.room_id,
@@ -72,9 +124,8 @@ class ReservationService:
                 }
                 parent = Reservation(**base_data)
                 self.repository.db.add(parent)
-                self.repository.db.flush()  # gera parent.id sem commitar ainda
+                self.repository.db.flush()  
 
-                # ── Cria as ocorrências filhas ─────────────────────────
                 for slot_start, slot_end in extra_slots:
                     child = Reservation(
                         user_id=user_id,
@@ -91,7 +142,7 @@ class ReservationService:
 
                 self.repository.db.commit()
                 self.repository.db.refresh(parent)
-                return parent  # Retorna apenas a reserva original
+                return parent 
 
         except HTTPException:
             self.repository.db.rollback()
@@ -120,7 +171,6 @@ class ReservationService:
         return reservation
 
     def check_in(self, reservation_id: int, current_user) -> Reservation:
-        """Registra check-in do usuário na reserva."""
         reservation = self.get(reservation_id)
 
         if current_user.role != "admin" and reservation.user_id != current_user.id:

@@ -36,7 +36,6 @@ class Reservation(Base):
         nullable=False,
     )
 
-    # ── Campos de recorrência ──────────────────────────────────────────
     recurrence_rule: Mapped[str] = mapped_column(
         String(20),
         default=RecurrenceRule.NONE.value,
@@ -52,7 +51,6 @@ class Reservation(Base):
         index=True,
     )
 
-    # ── Campos de no-show ──────────────────────────────────────────────
     checked_in_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,

@@ -32,6 +32,17 @@ A documentação interativa da API ficará disponível em:
 
 ---
 
+## ⚙️ Configuração (Variáveis de Ambiente)
+
+O sistema possui valores seguros por padrão, mas você pode personalizá-los. Para isso, basta criar um arquivo `.env` na raiz do projeto (ou renomear/copiar o arquivo `.env.example` que já disponibilizamos) e ajustar as variáveis de ambiente, como chaves de autenticação, tempos de tolerância e os **limites institucionais de uso por perfil**.
+
+```bash
+# Copiar o arquivo de exemplo para gerar o seu .env local
+cp .env.example .env
+```
+
+---
+
 ## 🛠️ Tecnologias e Decisões Técnicas
 
 - **Linguagem:** Python
@@ -95,6 +106,23 @@ requirements.txt
 7. **Aprovação:** O admin avalia as solicitações e pode **aprovar (`approved`)** ou **rejeitar (`rejected`)** a reserva.
 8. **Check-in / No-show:** Para reservas aprovadas, o usuário deve realizar o check-in no sistema na hora marcada. Caso não faça dentro da janela de tolerância, um Job em background cancela a reserva de forma automática.
 9. **Cancelamento:** A qualquer momento permitido, um usuário ou o admin pode cancelar ativamente a reserva.
+
+### 📋 Limites Institucionais por Perfil
+
+O sistema aplica restrições automáticas para usuários com perfil `user`, garantindo a rotação equitativa das salas em ambientes de alta demanda. Administradores (`admin`) são isentos de todos os limites.
+
+| Limite | Perfil `user` | Perfil `admin` |
+|---|---|---|
+| Reservas ativas simultâneas | Máx. 2 (`pending` + `approved`) | Sem limite |
+| Horas reservadas por dia | Máx. 4h (UTC) | Sem limite |
+| Duração por reserva | Máx. 2h | Sem limite |
+
+Os limites são configuráveis via variáveis de ambiente no arquivo `.env`:
+```env
+USER_MAX_ACTIVE_RESERVATIONS=2
+USER_MAX_HOURS_PER_DAY=4
+USER_MAX_HOURS_PER_RESERVATION=2
+```
 
 ---
 

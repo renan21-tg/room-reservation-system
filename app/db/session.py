@@ -54,13 +54,11 @@ def _migrate_sqlite_dev_schema() -> None:
 
     statements = []
 
-    # Migrações da tabela users
     if "password_hash" not in user_columns:
         statements.append("ALTER TABLE users ADD COLUMN password_hash VARCHAR(255)")
     if "role" not in user_columns:
         statements.append("ALTER TABLE users ADD COLUMN role VARCHAR(20) DEFAULT 'user'")
 
-    # Migrações da tabela reservations — campos de recorrência
     if "recurrence_rule" not in reservation_columns:
         statements.append(
             "ALTER TABLE reservations ADD COLUMN recurrence_rule VARCHAR(20) DEFAULT 'none' NOT NULL"

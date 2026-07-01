@@ -234,10 +234,7 @@ def test_concurrent_booking_no_double(client, admin_headers):
     assert results.count(201) == 1
     assert results.count(409) == 1
 
-# ── Testes de recorrência ──────────────────────────────────────────────
-
 def test_recurrence_weekly_creates_parent(client, admin_headers):
-    """Reserva semanal retorna a reserva original com recurrence_rule=weekly."""
     user, user_headers = make_user(client)
     room = make_room(client, admin_headers=admin_headers)
     r = client.post("/reservations", json={
@@ -252,15 +249,13 @@ def test_recurrence_weekly_creates_parent(client, admin_headers):
     assert r.status_code == 201
     data = r.json()
     assert data["recurrence_rule"] == "weekly"
-    assert data["parent_id"] is None  # é a reserva original
+    assert data["parent_id"] is None 
 
 
 def test_recurrence_conflict_aborts_entire_batch(client, admin_headers):
-    """Se uma ocorrência do lote conflita, nenhuma reserva é criada."""
     user, user_headers = make_user(client)
     room = make_room(client, admin_headers=admin_headers)
 
-    # Bloqueia a segunda semana
     client.post("/reservations", json={
         "user_id": user["id"],
         "room_id": room["id"],
@@ -269,7 +264,6 @@ def test_recurrence_conflict_aborts_entire_batch(client, admin_headers):
         "purpose": "Conflito intencional",
     }, headers=user_headers)
 
-    # Tenta criar série semanal que bate na semana bloqueada
     r = client.post("/reservations", json={
         "user_id": user["id"],
         "room_id": room["id"],
@@ -283,7 +277,6 @@ def test_recurrence_conflict_aborts_entire_batch(client, admin_headers):
 
 
 def test_recurrence_none_is_default(client, admin_headers):
-    """Reserva sem recurrence_rule usa 'none' por padrão."""
     user, user_headers = make_user(client)
     room = make_room(client, admin_headers=admin_headers)
     r = client.post("/reservations", json={
@@ -298,7 +291,6 @@ def test_recurrence_none_is_default(client, admin_headers):
 
 
 def test_recurrence_requires_end_date(client, admin_headers):
-    """recurrence_rule sem recurrence_end_date deve retornar 422."""
     user, user_headers = make_user(client)
     room = make_room(client, admin_headers=admin_headers)
     r = client.post("/reservations", json={
@@ -313,37 +305,30 @@ def test_recurrence_requires_end_date(client, admin_headers):
 
 
 def test_recurrence_daily_does_not_conflict_different_room(client, admin_headers):
-    """Série diária em sala A não conflita com reserva na sala B no mesmo horário."""
-    user, user_headers = make_user(client)
+    user1, user1_headers = make_user(client, "u1@test.com")
+    user2, user2_headers = make_user(client, "u2@test.com")
     room_a = make_room(client, admin_headers=admin_headers, name="Sala X")
     room_b = make_room(client, admin_headers=admin_headers, name="Sala Y")
-
-    # Série diária na sala A
     client.post("/reservations", json={
-        "user_id": user["id"],
+        "user_id": user1["id"],
         "room_id": room_a["id"],
         "starts_at": "2025-10-01T10:00:00+00:00",
         "ends_at": "2025-10-01T11:00:00+00:00",
         "purpose": "Serie A",
         "recurrence_rule": "daily",
         "recurrence_end_date": "2025-10-03T23:59:59+00:00",
-    }, headers=user_headers)
+    }, headers=user1_headers)
 
-    # Reserva avulsa na sala B no mesmo horário — não deve conflitar
     r = client.post("/reservations", json={
-        "user_id": user["id"],
+        "user_id": user2["id"],
         "room_id": room_b["id"],
         "starts_at": "2025-10-02T10:00:00+00:00",
         "ends_at": "2025-10-02T11:00:00+00:00",
         "purpose": "Sala B sem conflito",
-    }, headers=user_headers)
+    }, headers=user2_headers)
     assert r.status_code == 201
 
-
-# ── Testes de no-show ──────────────────────────────────────────────────
-
 def test_checkin_registers_timestamp(client, db, admin_headers):
-    """Check-in em reserva aprovada deve registrar checked_in_at."""
     user, user_headers = make_user(client)
     room = make_room(client, admin_headers)
     res = client.post("/reservations", json={
@@ -351,17 +336,14 @@ def test_checkin_registers_timestamp(client, db, admin_headers):
         "starts_at": BASE_START, "ends_at": BASE_END, "purpose": "Reuniao"
     }, headers=user_headers).json()
 
-    # Aprovar a reserva
     client.patch(f"/reservations/{res['id']}/approve", headers=admin_headers)
 
-    # Fazer check-in
     r = client.patch(f"/reservations/{res['id']}/checkin", headers=user_headers)
     assert r.status_code == 200
     assert r.json()["checked_in_at"] is not None
 
 
 def test_no_show_cancels_approved_without_checkin(db):
-    """Reserva aprovada sem check-in após o prazo é cancelada pelo job."""
     from datetime import datetime, timedelta, timezone
     from app.models.reservation import Reservation, ReservationStatus
     from app.models.room import Room
@@ -395,7 +377,6 @@ def test_no_show_cancels_approved_without_checkin(db):
 
 
 def test_no_show_does_not_cancel_with_checkin(db):
-    """Reserva com check-in registrado NÃO deve ser cancelada."""
     from datetime import datetime, timedelta, timezone
     from app.models.reservation import Reservation, ReservationStatus
     from app.models.room import Room
@@ -430,7 +411,6 @@ def test_no_show_does_not_cancel_with_checkin(db):
 
 
 def test_no_show_does_not_cancel_pending(db):
-    """Reserva com status pending NÃO deve ser cancelada pelo job de no-show."""
     from datetime import datetime, timedelta, timezone
     from app.models.reservation import Reservation, ReservationStatus
     from app.models.room import Room
@@ -464,7 +444,6 @@ def test_no_show_does_not_cancel_pending(db):
 
 
 def test_checkin_on_pending_reservation_returns_400(client, admin_headers):
-    """Check-in em reserva ainda pendente deve retornar 400."""
     user, user_headers = make_user(client)
     room = make_room(client, admin_headers)
     res = client.post("/reservations", json={
@@ -475,3 +454,123 @@ def test_checkin_on_pending_reservation_returns_400(client, admin_headers):
     r = client.patch(f"/reservations/{res['id']}/checkin", headers=user_headers)
     assert r.status_code == 400
 
+def test_user_cannot_exceed_max_reservation_duration(client, admin_headers):
+    _, user_headers = make_user(client)
+    room = make_room(client, admin_headers)
+    r = client.post("/reservations", json={
+        "room_id": room["id"],
+        "starts_at": "2025-11-01T08:00:00+00:00",
+        "ends_at":   "2025-11-01T11:00:00+00:00", 
+        "purpose": "Reuniao longa",
+    }, headers=user_headers)
+    assert r.status_code == 422
+    assert "limit" in r.json()["detail"].lower()
+
+
+def test_user_cannot_exceed_max_active_reservations(client, admin_headers):
+    _, user_headers = make_user(client)
+    room1 = make_room(client, admin_headers, name="Limite A")
+    room2 = make_room(client, admin_headers, name="Limite B")
+    room3 = make_room(client, admin_headers, name="Limite C")
+
+    client.post("/reservations", json={
+        "room_id": room1["id"],
+        "starts_at": "2025-11-01T09:00:00+00:00",
+        "ends_at":   "2025-11-01T10:00:00+00:00",
+        "purpose": "Reserva 1",
+    }, headers=user_headers)
+    client.post("/reservations", json={
+        "room_id": room2["id"],
+        "starts_at": "2025-11-02T09:00:00+00:00",
+        "ends_at":   "2025-11-02T10:00:00+00:00",
+        "purpose": "Reserva 2",
+    }, headers=user_headers)
+
+    r = client.post("/reservations", json={
+        "room_id": room3["id"],
+        "starts_at": "2025-11-03T09:00:00+00:00",
+        "ends_at":   "2025-11-03T10:00:00+00:00",
+        "purpose": "Reserva 3",
+    }, headers=user_headers)
+    assert r.status_code == 422
+    assert "limit" in r.json()["detail"].lower()
+
+
+def test_user_cannot_exceed_daily_hours(client, admin_headers):
+    from app.core.config import settings
+    original_active_limit = settings.user_max_active_reservations
+    settings.user_max_active_reservations = 10
+
+    try:
+        _, user_headers = make_user(client)
+        room1 = make_room(client, admin_headers, name="Diaria A")
+        room2 = make_room(client, admin_headers, name="Diaria B")
+        room3 = make_room(client, admin_headers, name="Diaria C")
+
+        client.post("/reservations", json={
+            "room_id": room1["id"],
+            "starts_at": "2025-11-10T08:00:00+00:00",
+            "ends_at":   "2025-11-10T10:00:00+00:00",
+            "purpose": "Manha",
+        }, headers=user_headers)
+
+        r2 = client.post("/reservations", json={
+            "room_id": room2["id"],
+            "starts_at": "2025-11-10T14:00:00+00:00",
+            "ends_at":   "2025-11-10T16:00:00+00:00",
+            "purpose": "Tarde",
+        }, headers=user_headers)
+        assert r2.status_code == 201  
+
+        r3 = client.post("/reservations", json={
+            "room_id": room3["id"],
+            "starts_at": "2025-11-10T17:00:00+00:00",
+            "ends_at":   "2025-11-10T18:00:00+00:00",
+            "purpose": "Extra",
+        }, headers=user_headers)
+        assert r3.status_code == 422
+        assert "daily limit" in r3.json()["detail"].lower()
+    finally:
+        settings.user_max_active_reservations = original_active_limit
+
+
+def test_admin_is_exempt_from_all_limits(client, admin_headers):
+    room = make_room(client, admin_headers, name="Admin Sala")
+
+    r = client.post("/reservations", json={
+        "room_id": room["id"],
+        "starts_at": "2025-12-01T08:00:00+00:00",
+        "ends_at":   "2025-12-01T11:00:00+00:00",
+        "purpose": "Reuniao longa do admin",
+    }, headers=admin_headers)
+    assert r.status_code == 201
+
+
+def test_canceled_reservation_does_not_count_toward_limit(client, admin_headers):
+    _, user_headers = make_user(client)
+    room1 = make_room(client, admin_headers, name="Count A")
+    room2 = make_room(client, admin_headers, name="Count B")
+    room3 = make_room(client, admin_headers, name="Count C")
+
+    r1 = client.post("/reservations", json={
+        "room_id": room1["id"],
+        "starts_at": "2025-12-10T09:00:00+00:00",
+        "ends_at":   "2025-12-10T10:00:00+00:00",
+        "purpose": "Cancelada 1",
+    }, headers=user_headers).json()
+    r2 = client.post("/reservations", json={
+        "room_id": room2["id"],
+        "starts_at": "2025-12-11T09:00:00+00:00",
+        "ends_at":   "2025-12-11T10:00:00+00:00",
+        "purpose": "Cancelada 2",
+    }, headers=user_headers).json()
+    client.patch(f"/reservations/{r1['id']}/cancel", headers=user_headers)
+    client.patch(f"/reservations/{r2['id']}/cancel", headers=user_headers)
+
+    r3 = client.post("/reservations", json={
+        "room_id": room3["id"],
+        "starts_at": "2025-12-12T09:00:00+00:00",
+        "ends_at":   "2025-12-12T10:00:00+00:00",
+        "purpose": "Nova apos cancelamentos",
+    }, headers=user_headers)
+    assert r3.status_code == 201

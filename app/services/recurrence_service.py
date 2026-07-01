@@ -12,13 +12,6 @@ def generate_occurrences(
     rule: RecurrenceRule,
     end_date: datetime,
 ) -> list[tuple[datetime, datetime]]:
-    """
-    Gera a lista de pares (starts_at, ends_at) para cada ocorrência
-    da série recorrente, EXCLUINDO a primeira (que é a reserva original).
-
-    Retorna lista vazia se rule == RecurrenceRule.NONE.
-    Limita a MAX_OCCURRENCES para evitar loops infinitos.
-    """
     if rule == RecurrenceRule.NONE:
         return []
 
@@ -35,7 +28,6 @@ def generate_occurrences(
 
 
 def _next_occurrence(dt: datetime, rule: RecurrenceRule) -> datetime:
-    """Avança a data para a próxima ocorrência conforme a regra."""
     if rule == RecurrenceRule.DAILY:
         return dt + timedelta(days=1)
 
@@ -43,8 +35,6 @@ def _next_occurrence(dt: datetime, rule: RecurrenceRule) -> datetime:
         return dt + timedelta(weeks=1)
 
     if rule == RecurrenceRule.MONTHLY:
-        # Avança um mês respeitando o número de dias do mês destino.
-        # Ex: 31/jan → 28/fev (não 03/mar).
         month = dt.month + 1
         year = dt.year
         if month > 12:

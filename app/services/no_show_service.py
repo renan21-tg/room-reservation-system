@@ -8,14 +8,6 @@ from app.models.reservation import Reservation, ReservationStatus
 
 
 def cancel_no_shows(db: Session | None = None) -> int:
-    """
-    Cancela reservas aprovadas cujo starts_at passou há mais de
-    `no_show_grace_minutes` minutos e que não tiveram check-in.
-
-    Retorna o número de reservas canceladas.
-    Cria e fecha a própria sessão se `db` não for fornecido
-    (comportamento padrão quando chamado pelo scheduler).
-    """
     own_session = db is None
     if own_session:
         db = SessionLocal()

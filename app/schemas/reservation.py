@@ -14,8 +14,6 @@ class ReservationCreate(BaseModel):
     starts_at: datetime
     ends_at: datetime
     purpose: str = Field(min_length=3, max_length=200)
-
-    # Campos opcionais de recorrência
     recurrence_rule: RecurrenceRule = RecurrenceRule.NONE
     recurrence_end_date: datetime | None = None
 
@@ -32,7 +30,6 @@ class ReservationCreate(BaseModel):
         if self.ends_at <= self.starts_at:
             raise ValueError("ends_at must be greater than starts_at")
 
-        # Validações de recorrência
         if self.recurrence_rule != RecurrenceRule.NONE:
             if self.recurrence_end_date is None:
                 raise ValueError(
